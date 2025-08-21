@@ -432,7 +432,7 @@ SELECT ?account ?type ?balance ?currency WHERE {
 
 ## Spending Analysis
 
-### 3. Monthly Spending by Category ⚠️ **PENDING CATEGORY DATA FIX**
+### 3. Monthly Spending by Category ✅ **WORKING**
 ```sparql
 PREFIX exs: <https://static.rwpz.net/spendcast/schema#>
 PREFIX ex: <https://static.rwpz.net/spendcast/>
@@ -454,9 +454,9 @@ GROUP BY ?month ?category ?category_label
 ORDER BY ?month DESC(?total_spent)
 ```
 
-**Note**: This example currently returns no results due to product category data structure issues. Products link to `https://static.rwpz.net/spendcast/migros/category/` but actual category instances are at `https://static.rwpz.net/spendcast/product/Category_*`.
+**Note**: This example is now working! The product categories have been fixed and return real spending data by category and month.
 
-### 4. Top Spending Merchants
+### 4. Top Spending Merchants ✅ **WORKING**
 ```sparql
 PREFIX exs: <https://static.rwpz.net/spendcast/schema#>
 PREFIX ex: <https://static.rwpz.net/spendcast/>
@@ -599,16 +599,19 @@ ORDER BY DESC(?date)
 - **Example 1a**: Find Transactions Through Bank Accounts Only  
 - **Example 1b**: Find Transactions Through Payment Cards Only
 - **Example 2**: Customer Account Summary
+- **Example 3**: Monthly Spending by Category
+- **Example 4**: Top Spending Merchants
 
 ### ⚠️ **Examples with Issues**
-- **Example 3**: Monthly Spending by Category - Product category data structure mismatch
-- **Examples 5-6**: CO2 Impact Analysis - Depend on product categories
-- **Examples 7-8**: Product Analysis - Depend on product categories
+- **Examples 5-6**: CO2 Impact Analysis - Dual category system issue (products link to `exs:Category`, CO2 factors are on `exs:ProductCategory`)
+- **Examples 7-8**: Product Analysis - May work but limited by dual category system
 
 ### 🔧 **Known Data Structure Issues**
-- Products link to `https://static.rwpz.net/spendcast/migros/category/` (placeholder)
-- Actual category instances are at `https://static.rwpz.net/spendcast/product/Category_*`
-- Category relationships need to be fixed in the data
+- ~~Products link to `https://static.rwpz.net/spendcast/migros/category/` (placeholder)~~ ✅ **FIXED**
+- ~~Actual category instances are at `https://static.rwpz.net/spendcast/product/Category_*`~~ ✅ **FIXED**
+- ~~Category relationships need to be fixed in the data~~ ✅ **FIXED**
+- Product categories now work correctly with proper labels and relationships
+- **Dual category system**: Products link to `exs:Category` instances, but CO2 factors and tax classes are on separate `exs:ProductCategory` instances
 
 ## Tips for Writing Queries
 
