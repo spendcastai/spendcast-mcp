@@ -104,6 +104,15 @@ Executes SPARQL queries against your GraphDB instance.
 SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 10
 ```
 
+**Working Examples:**
+The server includes several working SPARQL examples for:
+- Customer transaction analysis
+- Account and payment card usage
+- Spending patterns by category and merchant
+- Payment card usage patterns
+
+See the server documentation for complete working examples.
+
 **Returns:** JSON results from GraphDB or error information
 
 ## Development

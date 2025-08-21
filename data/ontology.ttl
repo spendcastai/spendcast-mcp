@@ -575,13 +575,6 @@ exs:withdrawalEnabled a owl:DatatypeProperty ;
     rdfs:domain exs:PaymentCard ;
     rdfs:range xsd:boolean .
 
-# CO2 Factor Property
-exs:co2Factor a owl:DatatypeProperty ;
-    rdfs:label "CO2 factor" ;
-    rdfs:comment "The CO2 factor for sustainability calculations" ;
-    rdfs:domain exs:ProductCategory ;
-    rdfs:range xsd:decimal .
-
 # Tax Class Property
 exs:taxClass a owl:DatatypeProperty ;
     rdfs:label "tax class" ;
@@ -708,11 +701,10 @@ exs:migipediaUrl a owl:DatatypeProperty ;
     rdfs:domain exs:Product ;
     rdfs:range xsd:string .
 
-# Migros Image Transparent URL Property
-exs:imageTransparentUrl a owl:DatatypeProperty ;
-    rdfs:label "Image Transparent URL" ;
-    rdfs:comment "The transparent image URL for a product" ;
-    rdfs:domain exs:Product ;
+# Image URL Property
+exs:imageUrl a owl:DatatypeProperty ;
+    rdfs:label "Image URL" ;
+    rdfs:comment "The image URL for the subject" ;
     rdfs:range xsd:string .
 
 # Migros Product URLs Property
