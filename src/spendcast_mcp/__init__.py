@@ -1,0 +1,1 @@
+"""Spendcast MCP Server."""
