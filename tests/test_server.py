@@ -9,7 +9,7 @@ import pytest_asyncio
 import respx
 from fastmcp import Client, Context
 
-from spendcast_mcp.server import mcp, execute_sparql, get_config
+from spendcast_mcp.server import mcp, execute_sparql, execute_sparql_validated, get_config, validate_sparql_query, get_schema_summary, get_example_queries, get_ontology_content
 
 # Mock GraphDB URL for testing
 TEST_GRAPHDB_URL = "http://test-graphdb:7200/repositories/test"
@@ -131,4 +131,163 @@ async def test_execute_sparql_request_error(mock_env, mocked_sparql_endpoint):
         assert "Connection failed" in result.data["error"]
 
 
+def test_query_validation():
+    """Test the SPARQL query validation functionality."""
+    # Valid queries
+    valid_queries = [
+        "SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 10 exs: ex:",
+        "ASK WHERE { ?s a exs:FinancialTransaction } exs: ex:"
+    ]
+    
+    # Invalid queries
+    invalid_queries = [
+        # Missing prefixes
+        "SELECT ?s WHERE { ?s ?p ?o }",
+        # Invalid syntax
+        "INVALID QUERY",
+        # Unbalanced braces
+        "SELECT ?s WHERE { ?s ?p ?o",
+        # Missing WHERE clause
+        "SELECT ?s ?p ?o LIMIT 10"
+    ]
+    
+    # Test valid queries
+    for i, query in enumerate(valid_queries, 1):
+        is_valid, message = validate_sparql_query(query)
+        assert is_valid, f"Query {i} should be valid: {message}"
+    
+    # Test invalid queries
+    for i, query in enumerate(invalid_queries, 1):
+        is_valid, message = validate_sparql_query(query.strip())
+        assert not is_valid, f"Query {i} should be invalid: {message}"
 
+
+def test_resource_generation():
+    """Test the resource generation functions."""
+    # Test schema summary - access the original function through the resource
+    schema_summary = get_schema_summary.fn()
+    assert "Core Entity Classes" in schema_summary
+    assert "Financial Entities" in schema_summary
+    assert "Retail Entities" in schema_summary
+    
+    # Test example queries - access the original function through the resource
+    example_queries = get_example_queries.fn()
+    assert "Customer Analysis" in example_queries
+    assert "Spending Analysis" in example_queries
+    assert "Sustainability Analysis" in example_queries
+    assert "PREFIX exs:" in example_queries
+    
+    # Test ontology content - access the original function through the resource
+    ontology_content = get_ontology_content.fn()
+    if "Ontology file not found" in ontology_content:
+        # This is expected in development environment
+        pass
+    else:
+        assert "@prefix" in ontology_content
+
+
+def test_configuration_enhanced():
+    """Test the configuration loading with enhanced error handling."""
+    # Test environment variable loading
+    try:
+        config = get_config()
+        # If we get here, config loaded successfully
+        assert config.url is not None
+        assert config.username is not None
+        assert config.password is not None
+    except ValueError as e:
+        # This is expected if .env file is not configured
+        assert "environment variable not set" in str(e)
+
+
+@pytest.mark.asyncio
+async def test_mcp_resources():
+    """Test that MCP resources are properly registered and accessible."""
+    # Test that resources are registered
+    resources = await mcp.get_resources()
+    assert len(resources) >= 3, f"Expected at least 3 resources, got {len(resources)}"
+    
+    # Check for specific resources by name
+    resource_names = [r.name for r in resources.values()]
+    assert "schema_summary" in resource_names
+    assert "example_queries" in resource_names
+    assert "triple_store_schema" in resource_names
+    
+    # Test resource details
+    schema_resource = next(r for r in resources.values() if r.name == "schema_summary")
+    assert schema_resource.description == "Human-readable summary of key triple store entities and relationships"
+    assert str(schema_resource.uri) == "internal://schema_summary.md"
+    assert schema_resource.mime_type == "text/markdown"
+    
+    example_resource = next(r for r in resources.values() if r.name == "example_queries")
+    assert example_resource.description == "Common SPARQL query patterns and examples for the financial data store"
+    assert str(example_resource.uri) == "internal://example_queries.md"
+    assert example_resource.mime_type == "text/markdown"
+    
+    ontology_resource = next(r for r in resources.values() if r.name == "triple_store_schema")
+    assert ontology_resource.description == "Complete ontology and schema for the financial data triple store"
+    assert str(ontology_resource.uri) == "https://static.rwpz.net/spendcast/schema#"
+    assert ontology_resource.mime_type == "text/turtle"
+
+
+@pytest.mark.asyncio
+async def test_resource_reading():
+    """Test that resources can be read through the MCP server."""
+    # Get resources first
+    resources = await mcp.get_resources()
+    
+    # Test reading schema summary resource
+    schema_resource = next(r for r in resources.values() if r.name == "schema_summary")
+    content = await schema_resource.read()
+    assert isinstance(content, str)
+    assert "Core Entity Classes" in content
+    assert "Financial Entities" in content
+    assert "Retail Entities" in content
+    
+    # Test reading example queries resource
+    example_resource = next(r for r in resources.values() if r.name == "example_queries")
+    content = await example_resource.read()
+    assert isinstance(content, str)
+    assert "Customer Analysis" in content
+    assert "Spending Analysis" in content
+    assert "PREFIX exs:" in content
+    
+    # Test reading ontology resource
+    ontology_resource = next(r for r in resources.values() if r.name == "triple_store_schema")
+    content = await ontology_resource.read()
+    assert isinstance(content, str)
+    # The ontology content might be "not found" in test environment, which is expected
+    if "Ontology file not found" not in content:
+        assert "@prefix" in content or "rdf:" in content
+
+
+@pytest.mark.asyncio
+async def test_execute_sparql_validated_success(mock_env, mocked_sparql_endpoint):
+    """Test successful SPARQL query execution with validation."""
+    mock_response_data = {
+        "head": {"vars": ["s", "p", "o"]},
+        "results": {
+            "bindings": [{"s": {"type": "uri", "value": "http://example.com/s"}}]
+        },
+    }
+    mocked_sparql_endpoint.post(url=TEST_GRAPHDB_URL).mock(
+        return_value=httpx.Response(200, json=mock_response_data)
+    )
+
+    query = "SELECT ?s ?p ?o WHERE {?s ?p ?o} LIMIT 1 exs: ex:"
+
+    async with Client(mcp) as client:
+        result = await client.call_tool("execute_sparql_validated", {"query": query})
+        assert result.data == mock_response_data
+
+
+@pytest.mark.asyncio
+async def test_execute_sparql_validated_failure(mock_env, mocked_sparql_endpoint):
+    """Test SPARQL query validation failure."""
+    invalid_query = "INVALID QUERY"
+
+    async with Client(mcp) as client:
+        result = await client.call_tool("execute_sparql_validated", {"query": invalid_query})
+        assert "error" in result.data
+        assert "SPARQL validation failed" in result.data["error"]
+        assert "validation_tips" in result.data

@@ -1,4 +1,7 @@
 # Byte-compiled / optimized / DLL files
+agent/
+spendcast_mcp.egg-info/
+
 __pycache__/
 *.py[codz]
 *$py.class
