@@ -90,38 +90,44 @@ async def execute_sparql(ctx: Context, query: str) -> Dict[str, Any]:
     Execute SPARQL queries against a financial data triple store containing comprehensive banking, transaction, and retail data. The store includes:\n\n
     **Core Financial Entities:**\n
     - **Accounts**: Checking, savings, credit cards, retirement accounts (3A pillar)\n
-    - **Parties**: Customers, banks, merchants, organizations with detailed contact information\n
-    - **Payment Cards**: Debit/credit cards with limits, status, and issuer details\n
+    - **Parties**: People (customers) and organizations (banks, merchants) with detailed contact information\n
+    - **Payment Cards**: Credit/debit cards linked to accounts for transactions\n
     - **Financial Transactions**: Complete transaction records with amounts, dates, status, and types\n\n
     **Retail & Receipt Data:**\n
-    - **Receipts**: Detailed purchase receipts with line items, dates, payment methods\n
-    - **Products**: Migros product catalog with EAN codes, prices, categories, CO2 factors\n
-    - **Product Categories**: Hierarchical classification with tax rates and sustainability metrics\n
-    - **Merchants**: Business entities with MCC codes and address information\n\n
+    - **Receipts**: Detailed purchase receipts with line items, dates, and payment methods\n
+    - **Products**: Migros product catalog with EAN codes, names, and category links\n
+    - **Product Categories**: Hierarchical classification (beverages, bread, cleaning, etc.)\n
+    - **Merchants**: Business entities with names and addresses\n\n
     **Key Data Properties:**\n
-    - Transaction amounts in CHF, EUR, USD with currency conversions\n
-    - CO2 footprint calculations for products and categories\n
-    - Tax classifications (standard, reduced, zero, exempt)\n
-    - Merchant Category Codes (MCC) for business classification\n
-    - Complete address and contact information for parties\n\n
+    - Transaction amounts in CHF with currency information\n
+    - Complete transaction dates and status tracking\n
+    - Account balances and payment card details\n
+    - Product information and receipt line items\n
+    - Customer account and card relationships\n\n
     **Query Capabilities:**\n
-    - Find transactions by date, amount, merchant, or account\n
-    - Analyze spending patterns and category distributions\n
-    - Calculate CO2 impact of purchases\n
-    - Track account balances and card usage\n
-    - Search products by category, price, or sustainability metrics\n\n
+    - Find transactions by customer, date, amount, or merchant\n
+    - Analyze spending patterns through accounts and payment cards\n
+    - Track account balances and payment card usage\n
+    - Search products and receipt details\n
+    - Analyze customer financial relationships\n\n
+    **Important Data Structure Insights:**\n
+    - **Customers** are `exs:Person` entities with direct `exs:hasAccount` relationships\n
+    - **Payment Cards** are linked to accounts via `exs:linkedAccount`\n
+    - **Transactions** use accounts (not cards directly) through `exs:hasParticipant` + `exs:Payer` role + `exs:isPlayedBy`\n
+    - **Receipts** have line items with products, but product categories may have data structure issues\n
+    - **Party Roles** (Payer, Payee, AccountHolder, CardHolder) mediate relationships between entities\n\n
     **Common Query Patterns:**\n
     - Use `exs:` prefix for schema properties (e.g., `exs:hasMonetaryAmount`)\n
     - Use `ex:` prefix for data instances (e.g., `ex:Swiss_franc`)\n
-    - Join transactions with receipts using `exs:hasReceipt`\n
-    - Filter by account holders using `exs:hasAccountHolder`\n
-    - Query product categories with `exs:hasCategory`\n\n
+    - Find customer transactions through accounts: `?person exs:hasAccount ?account`\n
+    - Find card transactions through linked accounts: `?card exs:linkedAccount ?account`\n
+    - Join transactions with receipts using `exs:hasReceipt`\n\n
     **Example Queries:**\n
-    - Find all transactions for a specific customer\n
-    - Calculate total spending by category for a date range\n
-    - List products with highest CO2 factors\n
-    - Find merchants by location or MCC code\n
-    - Analyze payment card usage patterns\n
+    - Find all transactions for a specific customer (working)\n
+    - Find transactions through bank accounts only (working)\n
+    - Find transactions through payment cards only (working)\n
+    - Get customer account summary (working)\n
+    - Monthly spending by category (pending category data fix)\n
 
     :param ctx: The tool context (unused in this implementation).
     :param query: The SPARQL query string to execute.
@@ -148,105 +154,143 @@ def get_schema_summary() -> str:
 
 ### Financial Entities
 - **Account** - Banking accounts (checking, savings, credit cards, retirement 3A)
-- **Party** - People and organizations (customers, banks, merchants)
-- **PaymentCard** - Credit/debit cards with limits and status
+- **Person** - Individual customers with accounts and payment cards
+- **Organization** - Banks, merchants, and other business entities
+- **PaymentCard** - Credit/debit cards linked to accounts for transactions
 - **FinancialTransaction** - Money transfers with amounts, dates, and status
-- **MonetaryAmount** - Currency amounts with exchange rates
+- **MonetaryAmount** - Currency amounts (primarily CHF)
+- **PartyRole** - Mediator entities (Payer, Payee, AccountHolder, CardHolder)
 
 ### Retail Entities  
 - **Receipt** - Purchase documents with line items and totals
-- **ReceiptLineItem** - Individual items on receipts
-- **Product** - Goods and services with pricing and metadata
-- **ProductCategory** - Hierarchical product classification
-- **Merchant** - Business entities with MCC codes
+- **ReceiptLineItem** - Individual items on receipts with products and amounts
+- **Product** - Goods and services with names, descriptions, and category links
+- **ProductCategory** - Hierarchical product classification (beverages, bread, cleaning, etc.)
+- **Merchant** - Business entities with names and addresses
 
 ## Key Properties
 
+### Person Properties
+- `exs:hasName` - Customer's full name
+- `exs:hasAccount` - Direct link to customer's accounts
+- `exs:hasPaymentCard` - Direct link to customer's payment cards
+- `exs:hasEmailAddress` - Customer's email
+- `exs:hasTelephoneNumber` - Customer's phone number
+
 ### Account Properties
-- `exs:hasAccountHolder` - Links account to customer
-- `exs:hasAccountProvider` - Links account to bank
-- `exs:accountNumber` - Account identifier
+- `exs:hasAccountHolder` - Links account to customer through role
+- `exs:hasAccountProvider` - Links account to bank through role
 - `exs:hasInitialBalance` - Starting balance
+- `exs:hasCurrency` - Account currency (primarily CHF)
+
+### Payment Card Properties
+- `exs:hasCardHolder` - Links card to customer through role
+- `exs:linkedAccount` - Links card to the account it uses for transactions
+- `exs:hasCardIssuer` - Links card to issuing bank through role
 
 ### Transaction Properties
 - `exs:hasMonetaryAmount` - Transaction amount
 - `exs:hasTransactionDate` - When transaction occurred
-- `exs:hasParticipant` - Who was involved
+- `exs:hasParticipant` - Who was involved (through PartyRole)
 - `exs:status` - settled/pending/rejected/cancelled
 - `exs:transactionType` - expense/income/transfer
+- `exs:hasReceipt` - Links to purchase receipt (if applicable)
 
 ### Product Properties
-- `exs:hasCategory` - Product classification
-- `exs:co2Factor` - Environmental impact metric
-- `exs:taxClass` - standard/reduced/zero/exempt
-- `exs:unitPrice` - Price per unit
+- `exs:category` - Product classification (currently linking to placeholder URI)
+- `exs:name` - Product name
+- `exs:description` - Product description
 - `exs:migrosId` - Migros product identifier
 
+### Receipt Line Item Properties
+- `exs:hasProduct` - Links to product (both name and GTIN)
+- `exs:lineSubtotal` - Amount for this line item
+- `exs:quantity` - Number of units purchased
+- `exs:unitPrice` - Price per unit
+
 ### Merchant Properties
-- `exs:merchantCategory` - MCC code classification
-- `exs:hasAddress` - Business location
 - `exs:hasName` - Business name
+- `exs:hasAddress` - Business location
 
 ## Common Query Patterns
 
-### Find Customer Transactions
+### Find Customer Transactions (Working Example)
 ```sparql
 PREFIX exs: <https://static.rwpz.net/spendcast/schema#>
 PREFIX ex: <https://static.rwpz.net/spendcast/>
 
-SELECT ?transaction ?amount ?date WHERE {
-  # Find customer's account
-  ?customer exs:hasName "Customer Name" ;
-    exs:hasAccount ?account .
+SELECT ?transaction ?amount ?date ?merchant ?payer_type WHERE {
+  # Find the customer
+  ?person exs:hasName "Jeanine Marie Blumenthal" .
   
-  # Transaction has a payer role played by the account
-  ?transaction a exs:FinancialTransaction ;
-    exs:hasParticipant ?payerRole .
-  ?payerRole a exs:Payer ;
-    exs:isPlayedBy ?account .
+  # Get their accounts
+  ?person exs:hasAccount ?account .
+  ?account a ?payer_type .
+  
+  # Find transactions where the account is a payer
+  ?transaction a exs:FinancialTransaction .
+  ?transaction exs:hasParticipant ?payerRole .
+  ?payerRole a exs:Payer .
+  ?payerRole exs:isPlayedBy ?account .
   
   # Get transaction details
   ?transaction exs:hasMonetaryAmount ?amount_uri .
-  ?amount_uri exs:hasAmount ?amount ;
-    exs:hasTransactionDate ?date .
+  ?amount_uri exs:hasAmount ?amount .
+  ?transaction exs:hasTransactionDate ?date .
+  
+  # Get merchant information (payee)
+  ?transaction exs:hasParticipant ?payeeRole .
+  ?payeeRole a exs:Payee .
+  ?payeeRole exs:isPlayedBy ?merchant .
+  ?merchant rdfs:label ?merchant_label .
 }
 ```
 
-**Note**: Customers participate in transactions through Party Roles (Payer, Payee) played by their accounts or payment cards.
-
-### Analyze Spending by Category
+### Find Transactions Through Payment Cards (Working Example)
 ```sparql
 PREFIX exs: <https://static.rwpz.net/spendcast/schema#>
 PREFIX ex: <https://static.rwpz.net/spendcast/>
 
-SELECT ?category ?total WHERE {
-  ?transaction a exs:FinancialTransaction ;
-    exs:hasReceipt ?receipt .
-  ?receipt exs:hasLineItem ?line_item .
-  ?line_item exs:hasProduct ?product .
-  ?product exs:hasCategory ?category .
+SELECT ?transaction ?amount ?date ?card_type ?linked_account WHERE {
+  ?person exs:hasName "Jeanine Marie Blumenthal" .
+  ?card exs:hasCardHolder ?cardHolderRole .
+  ?cardHolderRole exs:isPlayedBy ?person .
+  ?card a ?card_type .
+  ?card exs:linkedAccount ?linked_account .
+  
+  # Find transactions where the linked account is a payer
+  ?transaction a exs:FinancialTransaction .
+  ?transaction exs:hasParticipant ?payerRole .
+  ?payerRole a exs:Payer .
+  ?payerRole exs:isPlayedBy ?linked_account .
+  
   ?transaction exs:hasMonetaryAmount ?amount_uri .
   ?amount_uri exs:hasAmount ?amount .
+  ?transaction exs:hasTransactionDate ?date .
 }
-GROUP BY ?category
-ORDER BY DESC(?total)
 ```
 
-### CO2 Impact Analysis
+### Get Customer Account Summary (Working Example)
 ```sparql
 PREFIX exs: <https://static.rwpz.net/spendcast/schema#>
 PREFIX ex: <https://static.rwpz.net/spendcast/>
 
-SELECT ?category ?co2_factor ?total_spent WHERE {
-  ?category a exs:ProductCategory ;
-    exs:co2Factor ?co2_factor .
-  ?product exs:hasCategory ?category .
-  ?line_item exs:hasProduct ?product ;
-    exs:lineSubtotal ?amount .
+SELECT ?account ?type ?balance ?currency WHERE {
+  ?account a ?account_type .
+  ?account exs:hasAccountHolder ?holder_role .
+  ?holder_role exs:isPlayedBy ?person .
+  ?person exs:hasName "Jeanine Marie Blumenthal" .
+  ?account exs:hasInitialBalance ?balance .
+  ?account exs:hasCurrency ?currency .
+  VALUES ?account_type { exs:CheckingAccount exs:SavingsAccount exs:CreditCard exs:Retirement3A }
 }
-GROUP BY ?category ?co2_factor
-ORDER BY DESC(?co2_factor)
 ```
+
+**Key Insights**: 
+- **Direct relationships**: `?person exs:hasAccount ?account` and `?person exs:hasPaymentCard ?card`
+- **Role-based relationships**: `?account exs:hasAccountHolder ?role` → `?role exs:isPlayedBy ?person`
+- **Card-account linking**: `?card exs:linkedAccount ?account` (cards use accounts for transactions)
+- **Transaction participation**: Through `exs:hasParticipant` + `exs:Payer` role + `exs:isPlayedBy`
 """
 
 
@@ -262,10 +306,12 @@ def get_example_queries() -> str:
 
 ## Important Note on Customer-Transaction Relationships
 
-**Customers do not directly participate in transactions.** They participate through **Party Roles**:
+**Customers (Persons) have both direct and role-based relationships:**
 
-1. **Account Holder Role**: `?account exs:hasAccountHolder ?holderRole` → `?holderRole exs:isPlayedBy ?customer`
-2. **Card Holder Role**: `?card exs:hasCardHolder ?cardHolderRole` → `?cardHolderRole exs:isPlayedBy ?customer`
+1. **Direct relationships**: `?person exs:hasAccount ?account` and `?person exs:hasPaymentCard ?card`
+2. **Role-based relationships**: 
+   - `?account exs:hasAccountHolder ?holderRole` → `?holderRole exs:isPlayedBy ?person`
+   - `?card exs:hasCardHolder ?cardHolderRole` → `?cardHolderRole exs:isPlayedBy ?person`
 
 **Transactions have participants through Party Roles:**
 - `?transaction exs:hasParticipant ?payerRole` → `?payerRole exs:isPlayedBy ?payer`
@@ -279,9 +325,11 @@ def get_example_queries() -> str:
 - `exs:AccountProvider` - The bank providing an account
 - `exs:CardIssuer` - The bank issuing a payment card
 
+**Important**: Payment cards are linked to accounts via `exs:linkedAccount`, and transactions use the linked account (not the card directly).
+
 ## Customer Analysis
 
-### 1. Find All Transactions for a Specific Customer
+### 1. Find All Transactions for a Specific Customer ✅ **WORKING**
 ```sparql
 PREFIX exs: <https://static.rwpz.net/spendcast/schema#>
 PREFIX ex: <https://static.rwpz.net/spendcast/>
@@ -324,7 +372,7 @@ SELECT ?transaction ?amount ?date ?merchant ?payer_type WHERE {
 ORDER BY DESC(?date)
 ```
 
-### 1a. Find Transactions Through Bank Accounts Only
+### 1a. Find Transactions Through Bank Accounts Only ✅ **WORKING**
 ```sparql
 PREFIX exs: <https://static.rwpz.net/spendcast/schema#>
 PREFIX ex: <https://static.rwpz.net/spendcast/>
@@ -345,7 +393,7 @@ SELECT ?transaction ?amount ?date ?account_type WHERE {
 ORDER BY DESC(?date)
 ```
 
-### 1b. Find Transactions Through Payment Cards Only
+### 1b. Find Transactions Through Payment Cards Only ✅ **WORKING**
 ```sparql
 PREFIX exs: <https://static.rwpz.net/spendcast/schema#>
 PREFIX ex: <https://static.rwpz.net/spendcast/>
@@ -384,7 +432,7 @@ SELECT ?account ?type ?balance ?currency WHERE {
 
 ## Spending Analysis
 
-### 3. Monthly Spending by Category
+### 3. Monthly Spending by Category ⚠️ **PENDING CATEGORY DATA FIX**
 ```sparql
 PREFIX exs: <https://static.rwpz.net/spendcast/schema#>
 PREFIX ex: <https://static.rwpz.net/spendcast/>
@@ -405,6 +453,8 @@ SELECT ?month ?category ?category_label (SUM(?amount) AS ?total_spent) WHERE {
 GROUP BY ?month ?category ?category_label
 ORDER BY ?month DESC(?total_spent)
 ```
+
+**Note**: This example currently returns no results due to product category data structure issues. Products link to `https://static.rwpz.net/spendcast/migros/category/` but actual category instances are at `https://static.rwpz.net/spendcast/product/Category_*`.
 
 ### 4. Top Spending Merchants
 ```sparql
@@ -541,6 +591,24 @@ SELECT ?transaction ?base_currency ?counter_currency ?exchange_rate ?date WHERE 
 }
 ORDER BY DESC(?date)
 ```
+
+## Current Example Status
+
+### ✅ **Working Examples**
+- **Example 1**: Find All Transactions for a Specific Customer
+- **Example 1a**: Find Transactions Through Bank Accounts Only  
+- **Example 1b**: Find Transactions Through Payment Cards Only
+- **Example 2**: Customer Account Summary
+
+### ⚠️ **Examples with Issues**
+- **Example 3**: Monthly Spending by Category - Product category data structure mismatch
+- **Examples 5-6**: CO2 Impact Analysis - Depend on product categories
+- **Examples 7-8**: Product Analysis - Depend on product categories
+
+### 🔧 **Known Data Structure Issues**
+- Products link to `https://static.rwpz.net/spendcast/migros/category/` (placeholder)
+- Actual category instances are at `https://static.rwpz.net/spendcast/product/Category_*`
+- Category relationships need to be fixed in the data
 
 ## Tips for Writing Queries
 
