@@ -37,8 +37,6 @@ cd spendcast-mcp
 # Install dependencies using uv (recommended)
 uv sync
 
-# Or install using pip
-pip install -e .
 ```
 
 ## Configuration
