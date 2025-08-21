@@ -1,0 +1,13 @@
+{
+  "$schema": "https://gofastmcp.com/schemas/fastmcp_config/v1.json",
+  "entrypoint": {
+    "file": "src/spendcast_mcp/server.py",
+    "object": "mcp"
+  },
+  "environment": {
+    "dependencies": ["fastmcp", "httpx", "python-dotenv", "pydantic"]
+  }
+}
+
+
+

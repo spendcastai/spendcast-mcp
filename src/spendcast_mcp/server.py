@@ -43,7 +43,7 @@ def get_config() -> GraphDBConfig:
         url=graphdb_url, username=graphdb_user, password=graphdb_password
     )
 
-mcp = FastMCP()
+mcp = FastMCP(name="spendcast-mcp", instructions="MCP server for executing SPARQL queries against a financial data triple store")
 
 # --- Tool Definition ---
 async def _execute_sparql_impl(ctx: Context, query: str) -> Dict[str, Any]:
@@ -569,7 +569,7 @@ def get_ontology_content() -> str:
         if not os.path.exists(ontology_path):
             # Fall back to deploy/ontology.ttl (for production)
             ontology_path = os.path.join(os.path.dirname(__file__), "..", "..", "deploy", "ontology.ttl")
-        
+
         with open(ontology_path, 'r', encoding='utf-8') as f:
             return f.read()
     except FileNotFoundError:
