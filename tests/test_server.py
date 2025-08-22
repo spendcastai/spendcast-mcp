@@ -9,7 +9,7 @@ import pytest_asyncio
 import respx
 from fastmcp import Client, Context
 
-from spendcast_mcp.server import mcp, execute_sparql, execute_sparql_validated, get_config, validate_sparql_query, get_schema_summary, get_example_queries, get_ontology_content
+from spendcast_mcp.server import mcp, execute_sparql, execute_sparql_validated, get_config, validate_sparql_query, get_schema_summary, get_example_queries, get_ontology_content, get_schema_help
 
 # Mock GraphDB URL for testing
 TEST_GRAPHDB_URL = "http://test-graphdb:7200/repositories/test"
@@ -174,7 +174,7 @@ def test_resource_generation():
     example_queries = get_example_queries.fn()
     assert "Customer Analysis" in example_queries
     assert "Spending Analysis" in example_queries
-    assert "Sustainability Analysis" in example_queries
+    assert "Payment Card Usage Patterns" in example_queries
     assert "PREFIX exs:" in example_queries
     
     # Test ontology content - access the original function through the resource
@@ -291,3 +291,86 @@ async def test_execute_sparql_validated_failure(mock_env, mocked_sparql_endpoint
         assert "error" in result.data
         assert "SPARQL validation failed" in result.data["error"]
         assert "validation_tips" in result.data
+
+
+def test_get_schema_help():
+    """Test that get_schema_help returns the expected structure and content."""
+    result = get_schema_help.fn()
+    
+    # Check that it returns a dictionary
+    assert isinstance(result, dict)
+    
+    # Check required keys
+    required_keys = ["schema_summary", "example_queries", "ontology", "description", "quick_tips"]
+    for key in required_keys:
+        assert key in result, f"Missing required key: {key}"
+    
+    # Check resource URIs
+    assert result["schema_summary"] == "internal://schema_summary.md"
+    assert result["example_queries"] == "internal://example_queries.md"
+    assert result["ontology"] == "https://static.rwpz.net/spendcast/schema#"
+    
+    # Check description
+    assert "data structure" in result["description"]
+    assert "SPARQL queries" in result["description"]
+    
+    # Check quick_tips is a list with expected content
+    assert isinstance(result["quick_tips"], list)
+    assert len(result["quick_tips"]) >= 5
+    
+    # Check specific tips
+    tips_text = " ".join(result["quick_tips"])
+    assert "schema_summary.md" in tips_text
+    assert "example_queries.md" in tips_text
+    assert "exs:" in tips_text
+    assert "ex:" in tips_text
+    assert "accounts" in tips_text
+
+
+@pytest.mark.asyncio
+async def test_get_schema_help_tool_integration():
+    """Test that get_schema_help tool is properly registered and accessible via MCP."""
+    # Test that the tool is registered
+    tools = await mcp.get_tools()
+    tool_names = [tool.name for tool in tools.values()]
+    assert "get_schema_help" in tool_names
+    
+    # Test tool execution through MCP client
+    async with Client(mcp) as client:
+        result = await client.call_tool("get_schema_help", {})
+        
+        # Check the result structure
+        assert "schema_summary" in result.data
+        assert "example_queries" in result.data
+        assert "ontology" in result.data
+        assert "description" in result.data
+        assert "quick_tips" in result.data
+        
+        # Verify the tool provides actionable guidance
+        assert "Use these resources" in result.data["description"]
+        assert len(result.data["quick_tips"]) > 0
+
+
+def test_get_schema_help_content_quality():
+    """Test that get_schema_help provides high-quality, actionable content."""
+    result = get_schema_help.fn()
+    
+    # Check that quick_tips are actually helpful
+    tips = result["quick_tips"]
+    
+    # Should mention key resources
+    resource_tips = [tip for tip in tips if any(resource in tip for resource in ["schema_summary", "example_queries"])]
+    assert len(resource_tips) >= 2, "Should mention both schema and example resources"
+    
+    # Should mention key prefixes
+    prefix_tips = [tip for tip in tips if "exs:" in tip or "ex:" in tip]
+    assert len(prefix_tips) >= 2, "Should mention both exs: and ex: prefixes"
+    
+    # Should mention key relationships
+    relationship_tips = [tip for tip in tips if "accounts" in tip or "transactions" in tip]
+    assert len(relationship_tips) >= 1, "Should mention key entity relationships"
+    
+    # Check that description is helpful
+    description = result["description"]
+    assert len(description) > 50, "Description should be substantial"
+    assert "before writing" in description, "Should guide users on when to use the tool"

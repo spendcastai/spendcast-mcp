@@ -90,6 +90,12 @@ This server is compatible with any MCP client. Common alternatives include:
 
 ## Available Tools
 
+### `get_schema_help`
+
+Provides quick access to schema documentation and query examples. Use this tool before writing SPARQL queries to understand the data structure.
+
+**Returns:** Dictionary containing links to schema resources and usage guidance
+
 ### `execute_sparql`
 
 Executes SPARQL queries against your GraphDB instance.
@@ -198,3 +204,15 @@ For issues and questions:
 - [Claude Desktop](https://claude.ai/download)
 - [GraphDB Documentation](https://graphdb.ontotext.com/)
 - [SPARQL Query Language](https://www.w3.org/TR/sparql11-query/)
+
+## 🔒 License and Usage Restrictions
+
+The code and data in this repository are provided by PostFinance AG
+solely for participation in the BernHackt 2025 (22.08.2025 - 24.08.2025).
+
+- Use is permitted **only during the event**.  
+- Redistribution, retention after the event, or use for any other purpose 
+  is **strictly prohibited**.  
+- All rights remain with PostFinance AG.  
+
+See [LICENSE](LICENSE) for full terms.

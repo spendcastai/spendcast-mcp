@@ -43,13 +43,18 @@ def get_config() -> GraphDBConfig:
         url=graphdb_url, username=graphdb_user, password=graphdb_password
     )
 
-mcp = FastMCP(name="spendcast-mcp", instructions="MCP server for executing SPARQL queries against a financial data triple store")
+
+mcp = FastMCP(
+    name="spendcast-mcp",
+    instructions="MCP server for executing SPARQL queries against a financial data triple store",
+)
+
 
 # --- Tool Definition ---
 async def _execute_sparql_impl(ctx: Context, query: str) -> Dict[str, Any]:
     """
     Internal implementation of SPARQL query execution.
-    
+
     :param ctx: The tool context (unused in this implementation).
     :param query: The SPARQL query string to execute.
     :return: The JSON result from GraphDB or an error dictionary.
@@ -85,9 +90,40 @@ async def _execute_sparql_impl(ctx: Context, query: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+def get_schema_help() -> Dict[str, Any]:
+    """
+    Get schema documentation and query examples for the financial data store.
+    
+    This tool provides quick access to key resources that explain the data structure 
+    and provide query examples for common financial data operations. Use this before 
+    writing SPARQL queries to understand the data model.
+    
+    :return: Dictionary containing links to schema resources and usage guidance
+    """
+    return {
+        "schema_summary": "internal://schema_summary.md",
+        "example_queries": "internal://example_queries.md", 
+        "ontology": "https://static.rwpz.net/spendcast/schema#",
+        "description": "Use these resources to understand the data structure before writing SPARQL queries",
+        "quick_tips": [
+            "Check schema_summary.md for entity relationships",
+            "See example_queries.md for working SPARQL patterns",
+            "Use exs: prefix for schema properties (e.g., exs:hasAccount)",
+            "Use ex: prefix for data instances (e.g., ex:Swiss_franc)",
+            "Transactions use accounts, not cards directly"
+        ]
+    }
+
+
+@mcp.tool()
 async def execute_sparql(ctx: Context, query: str) -> Dict[str, Any]:
     """
     Execute SPARQL queries against a financial data triple store containing comprehensive banking, transaction, and retail data. The store includes:\n\n
+
+    **IMPORTANT: Before writing queries, use the `get_schema_help()` tool for quick schema reference, or consult these resources directly:**
+    - `internal://schema_summary.md` - Key entities, relationships, and schema patterns
+    - `internal://example_queries.md` - Common query patterns and working examples
+
     **Core Financial Entities:**\n
     - **Accounts**: Checking, savings, credit cards, retirement accounts (3A pillar)\n
     - **Parties**: People (customers) and organizations (banks, merchants) with detailed contact information\n
@@ -121,7 +157,9 @@ async def execute_sparql(ctx: Context, query: str) -> Dict[str, Any]:
     - Use `ex:` prefix for data instances (e.g., `ex:Swiss_franc`)\n
     - Find customer transactions through accounts: `?person exs:hasAccount ?account`\n
     - Find card transactions through linked accounts: `?card exs:linkedAccount ?account`\n
-    - Join transactions with receipts using `exs:hasReceipt`\n\n
+    - Join transactions with receipts using `exs:hasReceipt`
+    
+    **💡 Pro Tip:** Use `get_schema_help()` for quick schema reference before writing queries!\n\n
     **Example Queries:**\n
     - Find all transactions for a specific customer ✅\n
     - Find transactions through bank accounts only ✅\n
@@ -146,7 +184,7 @@ async def execute_sparql(ctx: Context, query: str) -> Dict[str, Any]:
     "internal://schema_summary.md",
     name="schema_summary",
     description="Human-readable summary of key triple store entities and relationships",
-    mime_type="text/markdown"
+    mime_type="text/markdown",
 )
 def get_schema_summary() -> str:
     """Generate a human-readable schema summary."""
@@ -342,7 +380,7 @@ SELECT ?account ?type ?balance ?currency WHERE {
     "internal://example_queries.md",
     name="example_queries",
     description="Common SPARQL query patterns and examples for the financial data store",
-    mime_type="text/markdown"
+    mime_type="text/markdown",
 )
 def get_example_queries() -> str:
     """Generate example SPARQL queries."""
@@ -565,18 +603,22 @@ ORDER BY DESC(?date)
     "https://static.rwpz.net/spendcast/schema#",
     name="triple_store_schema",
     description="Complete ontology and schema for the financial data triple store",
-    mime_type="text/turtle"
+    mime_type="text/turtle",
 )
 def get_ontology_content() -> str:
     """Read the ontology.ttl file content."""
     try:
         # Try data/ontology.ttl first (for development)
-        ontology_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "ontology.ttl")
+        ontology_path = os.path.join(
+            os.path.dirname(__file__), "..", "..", "data", "ontology.ttl"
+        )
         if not os.path.exists(ontology_path):
             # Fall back to deploy/ontology.ttl (for production)
-            ontology_path = os.path.join(os.path.dirname(__file__), "..", "..", "deploy", "ontology.ttl")
+            ontology_path = os.path.join(
+                os.path.dirname(__file__), "..", "..", "deploy", "ontology.ttl"
+            )
 
-        with open(ontology_path, 'r', encoding='utf-8') as f:
+        with open(ontology_path, "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
         return "# Ontology file not found. Please ensure data/ontology.ttl or deploy/ontology.ttl exists."
@@ -588,7 +630,7 @@ def get_ontology_content() -> str:
 def validate_sparql_query(query: str) -> tuple[bool, str]:
     """
     Basic SPARQL query validation.
-    
+
     :param query: The SPARQL query string to validate
     :return: Tuple of (is_valid, error_message)
     """
@@ -608,11 +650,11 @@ def validate_sparql_query(query: str) -> tuple[bool, str]:
         return False, "Query must start with SELECT, ASK, CONSTRUCT, or DESCRIBE"
 
     # Check for balanced braces
-    if query.count('{') != query.count('}'):
+    if query.count("{") != query.count("}"):
         return False, "Unbalanced braces in SPARQL query"
 
     # Check for basic WHERE clause
-    if '{' not in query or '}' not in query:
+    if "{" not in query or "}" not in query:
         return False, "Missing WHERE clause with braces"
 
     return True, "Query is valid"
@@ -623,10 +665,10 @@ def validate_sparql_query(query: str) -> tuple[bool, str]:
 async def execute_sparql_validated(ctx: Context, query: str) -> Dict[str, Any]:
     """
     Execute SPARQL queries with validation against a financial data triple store.
-    
+
     This tool provides the same functionality as execute_sparql but includes
     basic query validation to catch common syntax errors before sending to GraphDB.
-    
+
     :param ctx: The tool context (unused in this implementation).
     :param query: The SPARQL query string to execute.
     :return: The JSON result from GraphDB or an error dictionary.
@@ -641,8 +683,8 @@ async def execute_sparql_validated(ctx: Context, query: str) -> Dict[str, Any]:
                 "Ensure your query starts with SELECT, ASK, CONSTRUCT, or DESCRIBE",
                 "Include both exs: and ex: prefixes",
                 "Check that all braces { } are properly balanced",
-                "Verify your WHERE clause syntax"
-            ]
+                "Verify your WHERE clause syntax",
+            ],
         }
 
     # If validation passes, execute the query
