@@ -2,6 +2,29 @@
 
 This MCP (Model Context Protocol) server provides a comprehensive interface to query a financial data triple store containing banking, transaction, and retail data.
 
+## Claude Desktop 
+Open the MCP-Configuration file under "Settings" → "Developer" and add the following configuration:
+
+### Example Configuration
+
+```json
+    "spendcast-mcp": {
+      "command": "/<path-to>/bin/uv",
+      "args": [
+        "--directory",
+        "/<path-to>/spendcast-mcp",
+        "run",
+        "src/spendcast_mcp/server.py"
+      ],
+      "env": {
+        "GRAPHDB_URL": "https://localhost:7200/repositories/demo",
+        "GRAPHDB_USER": "user",
+        "GRAPHDB_PASSWORD": "pass"
+      },
+      "transport": "stdio"
+    }
+```
+
 ## Features
 
 ### 🛠️ Tools
@@ -233,6 +256,14 @@ When adding new features:
 4. Add validation where appropriate
 5. Update this README
 
-## License
+## 🔒 License and Usage Restrictions
 
-This project is part of the baernhaeckt financial data analysis system.
+The code and data in this repository are provided by PostFinance AG
+solely for participation in the BernHackt 2025 (22.08.2025 - 24.08.2025).
+
+- Use is permitted **only during the event**.  
+- Redistribution, retention after the event, or use for any other purpose 
+  is **strictly prohibited**.  
+- All rights remain with PostFinance AG.  
+
+See [LICENSE](../../LICENSE) for full terms.
