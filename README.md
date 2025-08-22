@@ -92,9 +92,20 @@ This server is compatible with any MCP client. Common alternatives include:
 
 ### `get_schema_help`
 
-Provides quick access to schema documentation and query examples. Use this tool before writing SPARQL queries to understand the data structure.
+Provides immediate access to complete schema information and working examples. This is the recommended tool to use before writing SPARQL queries as it returns all the content directly.
 
-**Returns:** Dictionary containing links to schema resources and usage guidance
+**Returns:** Dictionary containing complete schema content and examples
+
+### `get_schema_content`
+
+Reads and returns the actual content of specific schema resources. Use this if you need to access individual resources separately.
+
+**Parameters:**
+- `resource_name` (string): Which resource to read. Options: "schema_summary", "example_queries", "ontology"
+
+**Returns:** Dictionary containing the resource content and metadata
+
+**Note:** The ontology resource automatically falls back to the online version at [https://static.rwpz.net/spendcast/schema#](https://static.rwpz.net/spendcast/schema#) if local files are not available.
 
 ### `execute_sparql`
 
@@ -187,9 +198,17 @@ logging.basicConfig(level=logging.DEBUG)
 5. Ensure all tests pass
 6. Submit a pull request
 
-## License
+## 🔒 License and Usage Restrictions
 
-This project is licensed under the terms specified in the LICENSE file.
+The code and data in this repository are provided by PostFinance AG
+solely for participation in the BernHackt 2025 (22.08.2025 - 24.08.2025).
+
+- Use is permitted **only during the event**.  
+- Redistribution, retention after the event, or use for any other purpose 
+  is **strictly prohibited**.  
+- All rights remain with PostFinance AG.  
+
+See [LICENSE](LICENSE) for full terms.
 
 ## Support
 
@@ -204,15 +223,3 @@ For issues and questions:
 - [Claude Desktop](https://claude.ai/download)
 - [GraphDB Documentation](https://graphdb.ontotext.com/)
 - [SPARQL Query Language](https://www.w3.org/TR/sparql11-query/)
-
-## 🔒 License and Usage Restrictions
-
-The code and data in this repository are provided by PostFinance AG
-solely for participation in the BernHackt 2025 (22.08.2025 - 24.08.2025).
-
-- Use is permitted **only during the event**.  
-- Redistribution, retention after the event, or use for any other purpose 
-  is **strictly prohibited**.  
-- All rights remain with PostFinance AG.  
-
-See [LICENSE](LICENSE) for full terms.

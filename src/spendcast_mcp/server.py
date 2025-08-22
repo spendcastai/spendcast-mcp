@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -94,25 +95,69 @@ def get_schema_help() -> Dict[str, Any]:
     """
     Get schema documentation and query examples for the financial data store.
     
-    This tool provides quick access to key resources that explain the data structure 
-    and provide query examples for common financial data operations. Use this before 
-    writing SPARQL queries to understand the data model.
+    This tool provides immediate access to schema information and working examples
+    to help you write SPARQL queries. No need to access separate resources.
     
-    :return: Dictionary containing links to schema resources and usage guidance
+    :return: Dictionary containing schema content and examples
     """
     return {
-        "schema_summary": "internal://schema_summary.md",
-        "example_queries": "internal://example_queries.md", 
-        "ontology": "https://static.rwpz.net/spendcast/schema#",
-        "description": "Use these resources to understand the data structure before writing SPARQL queries",
+        "schema_summary": get_schema_summary.fn(),
+        "example_queries": get_example_queries.fn(),
+        "ontology": get_ontology_content.fn(),
+        "description": "Complete schema information and examples for writing SPARQL queries",
         "quick_tips": [
-            "Check schema_summary.md for entity relationships",
-            "See example_queries.md for working SPARQL patterns",
             "Use exs: prefix for schema properties (e.g., exs:hasAccount)",
             "Use ex: prefix for data instances (e.g., ex:Swiss_franc)",
-            "Transactions use accounts, not cards directly"
-        ]
+            "Transactions use accounts, not cards directly",
+            "Check the schema_summary for entity relationships",
+            "See example_queries for working SPARQL patterns"
+        ],
+        "note": "All content is included directly - no need to access separate resources",
+        "ontology_source": "Local files with online fallback at https://static.rwpz.net/spendcast/schema#"
     }
+
+
+@mcp.tool()
+def get_schema_content(resource_name: str = "schema_summary") -> Dict[str, Any]:
+    """
+    Get the actual content of schema resources instead of just the URIs.
+    
+    This tool reads and returns the content of schema resources, making it easier
+    to access schema information without having to use MCP resource reading.
+    
+    :param resource_name: Which resource to read. Options: "schema_summary", "example_queries", "ontology"
+    :return: Dictionary containing the resource content and metadata
+    """
+    resource_map = {
+        "schema_summary": ("internal://schema_summary.md", get_schema_summary.fn),
+        "example_queries": ("internal://example_queries.md", get_example_queries.fn),
+        "ontology": ("https://static.rwpz.net/spendcast/schema#", get_ontology_content.fn)
+    }
+
+    if resource_name not in resource_map:
+        return {
+            "error": f"Unknown resource: {resource_name}",
+            "available_resources": list(resource_map.keys()),
+            "suggestion": "Use one of the available resource names"
+        }
+
+    uri, resource_func = resource_map[resource_name]
+
+    try:
+        content = resource_func()
+        return {
+            "resource_name": resource_name,
+            "uri": uri,
+            "content": content,
+            "content_length": len(content),
+            "note": "This is the actual content, not just a URI reference"
+        }
+    except Exception as e:
+        return {
+            "error": f"Failed to read resource {resource_name}: {str(e)}",
+            "resource_name": resource_name,
+            "uri": uri
+        }
 
 
 @mcp.tool()
@@ -120,9 +165,10 @@ async def execute_sparql(ctx: Context, query: str) -> Dict[str, Any]:
     """
     Execute SPARQL queries against a financial data triple store containing comprehensive banking, transaction, and retail data. The store includes:\n\n
 
-    **IMPORTANT: Before writing queries, use the `get_schema_help()` tool for quick schema reference, or consult these resources directly:**
-    - `internal://schema_summary.md` - Key entities, relationships, and schema patterns
-    - `internal://example_queries.md` - Common query patterns and working examples
+    **IMPORTANT: Before writing queries, use these tools for schema help:**
+    - `get_schema_help()` - Complete schema information and examples (recommended)
+    - `get_schema_content('schema_summary')` - Read entity relationships and schema patterns
+    - `get_schema_content('example_queries')` - Read working SPARQL examples
 
     **Core Financial Entities:**\n
     - **Accounts**: Checking, savings, credit cards, retirement accounts (3A pillar)\n
@@ -159,7 +205,7 @@ async def execute_sparql(ctx: Context, query: str) -> Dict[str, Any]:
     - Find card transactions through linked accounts: `?card exs:linkedAccount ?account`\n
     - Join transactions with receipts using `exs:hasReceipt`
     
-    **💡 Pro Tip:** Use `get_schema_help()` for quick schema reference before writing queries!\n\n
+    **💡 Pro Tip:** Use `get_schema_help()` to get complete schema information and examples before writing queries!\n\n
     **Example Queries:**\n
     - Find all transactions for a specific customer ✅\n
     - Find transactions through bank accounts only ✅\n
@@ -606,7 +652,7 @@ ORDER BY DESC(?date)
     mime_type="text/turtle",
 )
 def get_ontology_content() -> str:
-    """Read the ontology.ttl file content."""
+    """Read the ontology.ttl file content with online fallback."""
     try:
         # Try data/ontology.ttl first (for development)
         ontology_path = os.path.join(
@@ -621,9 +667,32 @@ def get_ontology_content() -> str:
         with open(ontology_path, "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        return "# Ontology file not found. Please ensure data/ontology.ttl or deploy/ontology.ttl exists."
+        # Fallback to online ontology
+        try:
+
+            # Create a simple async function to fetch the online ontology
+            async def fetch_online_ontology():
+                async with httpx.AsyncClient() as client:
+                    response = await client.get("https://static.rwpz.net/spendcast/schema#", timeout=10.0)
+                    response.raise_for_status()
+                    return response.text
+
+            # Run the async function in a new event loop if needed
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If we're already in an async context, we can't use run_until_complete
+                    return "# Ontology file not found locally. Online ontology available at: https://static.rwpz.net/spendcast/schema#"
+                else:
+                    return loop.run_until_complete(fetch_online_ontology())
+            except RuntimeError:
+                # No event loop available, return the URL
+                return "# Ontology file not found locally. Online ontology available at: https://static.rwpz.net/spendcast/schema#"
+
+        except Exception as fetch_error:
+            return f"# Ontology file not found locally. Online ontology available at: https://static.rwpz.net/spendcast/schema#\n# Error fetching online version: {str(fetch_error)}"
     except Exception as e:
-        return f"# Error reading ontology file: {str(e)}"
+        return f"# Error reading ontology file: {str(e)}\n# Online ontology available at: https://static.rwpz.net/spendcast/schema#"
 
 
 # --- Query Validation ---

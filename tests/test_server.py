@@ -9,7 +9,7 @@ import pytest_asyncio
 import respx
 from fastmcp import Client, Context
 
-from spendcast_mcp.server import mcp, execute_sparql, execute_sparql_validated, get_config, validate_sparql_query, get_schema_summary, get_example_queries, get_ontology_content, get_schema_help
+from spendcast_mcp.server import mcp, execute_sparql, execute_sparql_validated, get_config, validate_sparql_query, get_schema_summary, get_example_queries, get_ontology_content, get_schema_help, get_schema_content
 
 # Mock GraphDB URL for testing
 TEST_GRAPHDB_URL = "http://test-graphdb:7200/repositories/test"
@@ -256,8 +256,8 @@ async def test_resource_reading():
     ontology_resource = next(r for r in resources.values() if r.name == "triple_store_schema")
     content = await ontology_resource.read()
     assert isinstance(content, str)
-    # The ontology content might be "not found" in test environment, which is expected
-    if "Ontology file not found" not in content:
+    # The ontology content might be "not found" in test environment, or might contain online fallback info
+    if "Ontology file not found" not in content and "Online ontology available" not in content:
         assert "@prefix" in content or "rdf:" in content
 
 
@@ -301,17 +301,21 @@ def test_get_schema_help():
     assert isinstance(result, dict)
     
     # Check required keys
-    required_keys = ["schema_summary", "example_queries", "ontology", "description", "quick_tips"]
+    required_keys = ["schema_summary", "example_queries", "ontology", "description", "quick_tips", "ontology_source"]
     for key in required_keys:
         assert key in result, f"Missing required key: {key}"
     
-    # Check resource URIs
-    assert result["schema_summary"] == "internal://schema_summary.md"
-    assert result["example_queries"] == "internal://example_queries.md"
-    assert result["ontology"] == "https://static.rwpz.net/spendcast/schema#"
+    # Check that content is returned (not URIs)
+    assert isinstance(result["schema_summary"], str)
+    assert isinstance(result["example_queries"], str)
+    assert isinstance(result["ontology"], str)
+    
+    # Check that content contains expected information
+    assert "Core Entity Classes" in result["schema_summary"]
+    assert "Customer Analysis" in result["example_queries"]
     
     # Check description
-    assert "data structure" in result["description"]
+    assert "schema information" in result["description"]
     assert "SPARQL queries" in result["description"]
     
     # Check quick_tips is a list with expected content
@@ -320,8 +324,8 @@ def test_get_schema_help():
     
     # Check specific tips
     tips_text = " ".join(result["quick_tips"])
-    assert "schema_summary.md" in tips_text
-    assert "example_queries.md" in tips_text
+    assert "schema_summary" in tips_text
+    assert "example_queries" in tips_text
     assert "exs:" in tips_text
     assert "ex:" in tips_text
     assert "accounts" in tips_text
@@ -345,9 +349,10 @@ async def test_get_schema_help_tool_integration():
         assert "ontology" in result.data
         assert "description" in result.data
         assert "quick_tips" in result.data
+        assert "ontology_source" in result.data
         
         # Verify the tool provides actionable guidance
-        assert "Use these resources" in result.data["description"]
+        assert "Complete schema information" in result.data["description"]
         assert len(result.data["quick_tips"]) > 0
 
 
@@ -373,4 +378,106 @@ def test_get_schema_help_content_quality():
     # Check that description is helpful
     description = result["description"]
     assert len(description) > 50, "Description should be substantial"
-    assert "before writing" in description, "Should guide users on when to use the tool"
+    assert "writing SPARQL queries" in description, "Should guide users on when to use the tool"
+
+
+def test_get_schema_content_schema_summary():
+    """Test that get_schema_content returns schema summary content correctly."""
+    result = get_schema_content.fn("schema_summary")
+    
+    # Check structure
+    assert "resource_name" in result
+    assert "uri" in result
+    assert "content" in result
+    assert "content_length" in result
+    
+    # Check values
+    assert result["resource_name"] == "schema_summary"
+    assert result["uri"] == "internal://schema_summary.md"
+    assert "Core Entity Classes" in result["content"]
+    assert result["content_length"] > 0
+
+
+def test_get_schema_content_example_queries():
+    """Test that get_schema_content returns example queries content correctly."""
+    result = get_schema_content.fn("example_queries")
+    
+    # Check structure
+    assert "resource_name" in result
+    assert "uri" in result
+    assert "content" in result
+    assert "content_length" in result
+    
+    # Check values
+    assert result["resource_name"] == "example_queries"
+    assert result["uri"] == "internal://example_queries.md"
+    assert "Customer Analysis" in result["content"]
+    assert "PREFIX exs:" in result["content"]
+    assert result["content_length"] > 0
+
+
+def test_get_schema_content_ontology():
+    """Test that get_schema_content returns ontology content correctly."""
+    result = get_schema_content.fn("ontology")
+    
+    # Check structure
+    assert "resource_name" in result
+    assert "uri" in result
+    assert "content" in result
+    
+    # Check values
+    assert result["resource_name"] == "ontology"
+    assert result["uri"] == "https://static.rwpz.net/spendcast/schema#"
+    
+    # Content might be "not found" in test environment, which is expected
+    if "Ontology file not found" not in result["content"]:
+        assert "@prefix" in result["content"] or "rdf:" in result["content"]
+
+
+def test_get_schema_content_invalid_resource():
+    """Test that get_schema_content handles invalid resource names gracefully."""
+    result = get_schema_content.fn("invalid_resource")
+    
+    # Check error structure
+    assert "error" in result
+    assert "Unknown resource: invalid_resource" in result["error"]
+    assert "available_resources" in result
+    assert "suggestion" in result
+    
+    # Check available resources list
+    available = result["available_resources"]
+    assert "schema_summary" in available
+    assert "example_queries" in available
+    assert "ontology" in available
+
+
+def test_get_schema_content_default_parameter():
+    """Test that get_schema_content defaults to schema_summary when no parameter is given."""
+    result = get_schema_content.fn()
+    
+    # Should default to schema_summary
+    assert result["resource_name"] == "schema_summary"
+    assert "Core Entity Classes" in result["content"]
+
+
+@pytest.mark.asyncio
+async def test_get_schema_content_tool_integration():
+    """Test that get_schema_content tool is properly registered and accessible via MCP."""
+    # Test that the tool is registered
+    tools = await mcp.get_tools()
+    tool_names = [tool.name for tool in tools.values()]
+    assert "get_schema_content" in tool_names
+    
+    # Test tool execution through MCP client
+    async with Client(mcp) as client:
+        result = await client.call_tool("get_schema_content", {"resource_name": "schema_summary"})
+        
+        # Check the result structure
+        assert "resource_name" in result.data
+        assert "uri" in result.data
+        assert "content" in result.data
+        assert "content_length" in result.data
+        
+        # Verify the content is actually returned
+        assert result.data["resource_name"] == "schema_summary"
+        assert "Core Entity Classes" in result.data["content"]
