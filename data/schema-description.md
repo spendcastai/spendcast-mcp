@@ -1,4 +1,4 @@
-#### Node Types
+## Node Types
 (pfm:Party() /* Represents a party involved in a financial transaction. */ {
     hasName: STRING /* The name of a party */
     hasTelephoneNumber /* The telephone number of a party */
@@ -10,7 +10,7 @@
     citizenship: STRING /* The citizenship of a person */
 })
 
-(pfm:Address() /* */ {
+(pfm:Address() /* A physical or logical address */ {
     addressType: STRING /* The type of address (e.g., home, work, billing) */
     street: STRING /* The street address */
     city: STRING /* The city name */
@@ -128,7 +128,7 @@
     taxClass: STRING /* The tax classification for a product category */
 })
 
-#### Relationships
+## Relationships
 (pfm:Account)-[pfm:hasAccountHolder /* Links an account to its holder */ {}]->(pfm:AccountHolder)
 (pfm:Account)-[pfm:hasAccountProvider /* Links an account to its provider */ {}]->(pfm:AccountProvider)
 (pfm:Party)-[pfm:hasAccount Account /* Links a party to their account */ {}]->(pfm:Account)
