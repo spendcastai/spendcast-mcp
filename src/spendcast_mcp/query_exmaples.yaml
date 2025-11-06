@@ -1,0 +1,157 @@
+---
+- question: Show my profile
+  sparql: |
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    PREFIX pfm: <https://static.rwpz.net/spendcast/schema#>
+    select ?name ?birthDate ?phoneNumber
+    WHERE {
+      ?person a pfm:Person ;
+        rdfs:label ?name .
+      OPTIONAL { ?person pfm:birthDate ?birthDate } .
+      OPTIONAL { ?person pfm:hasTelephoneNumber ?phoneNumber } .
+    }
+- question: Show all my accounts with name, purpose, account number, currency and initial balance
+  sparql: |
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    PREFIX pfm: <https://static.rwpz.net/spendcast/schema#>
+    SELECT ?label ?accountPurpose ?initialBalance ?accNum ?accountCurrency
+    WHERE {
+      ?account a pfm:Account ;
+        pfm:hasAccountPurpose ?accountPurpose ;
+        rdfs:label ?label .
+        OPTIONAL{ ?account pfm:hasInitialBalance ?initialBalance} .
+        OPTIONAL{ ?account pfm:accountNumber ?accNum} .
+        OPTIONAL{ ?account pfm:hasCurrency ?accountCurrency}
+        OPTIONAL{ ?account pfm:hasCurrency ?accountCurrency}
+    }
+- question: Show me the current balance of the account number "1234567890" between 2024-07-01 and 2025-07-01
+  sparql: |
+    PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    PREFIX pfm: <https://static.rwpz.net/spendcast/schema#>
+    SELECT (SUM(IF(?transactionType = 'income', ?amount, -?amount)) as ?balance) where {
+      ?account pfm:accountNumber "1234567890" .
+      ?participantRole pfm:isPlayedBy ?account .
+      ?transaction pfm:hasParticipant ?participantRole .
+      ?transaction a pfm:FinancialTransaction ;
+        pfm:hasMonetaryAmount ?monetaryAmount ;
+        pfm:hasTransactionDate ?transactionDate ;
+        pfm:transactionType ?transactionType ;
+        pfm:status ?transactionStatus .
+          
+      ?monetaryAmount pfm:hasCurrency ?currency ;
+        pfm:hasAmount ?amount .
+          
+      FILTER(strstarts(?transactionStatus, "settled"))
+      FILTER (?transactionDate >= "2024-07-01"^^xsd:date)
+      FILTER (?transactionDate < "2025-07-01"^^xsd:date)
+    }
+- question: Show me the last 100 expense transactions ordered by transaction date, descending
+  sparql: |
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+    PREFIX pfm: <https://static.rwpz.net/spendcast/schema#>
+    SELECT ?transactionId ?transactionDate ?transactionStatus ?transactionType ?amount ?currency ?payer ?payee ?receiptId {
+      ?transaction a pfm:FinancialTransaction ;
+      pfm:hasMonetaryAmount ?monetaryAmount ;
+      pfm:hasTransactionDate ?transactionDate ;
+      pfm:transactionType ?transactionType ;    
+      rdfs:label ?transactionId ;
+      pfm:status ?transactionStatus ;
+      pfm:hasParticipant [
+          a pfm:Payer ;
+          pfm:isPlayedBy/rdfs:label ?payer
+      #pfm:accountNumber ?payerAccountNumber 
+      ] ;
+      pfm:hasParticipant [
+          a pfm:Payee ;
+          pfm:isPlayedBy/rdfs:label ?payee 
+      ] .
+  
+      OPTIONAL { ?transaction pfm:hasReceipt/rdfs:label ?receiptId } .
+      ?monetaryAmount pfm:hasCurrency ?currency ;
+      pfm:hasAmount ?amount .
+    }
+- question: Show me all my payment cards
+  sparql: |
+    PREFIX pfm: <https://static.rwpz.net/spendcast/schema#> 
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> 
+    SELECT ?cardNumber ?cardType ?expiryDate ?linkedAccountNumber ?cardIssuer ?cardSchemeOperator WHERE { 
+      ?card a pfm:PaymentCard ;
+      pfm:cardNumber ?cardNumber ;
+      pfm:cardType ?cardType ;
+      pfm:expiryDate ?expiryDate ;
+      pfm:hasCardIssuer/pfm:isPlayedBy/rdfs:label ?cardIssuer ;
+      pfm:cardSchemeOperator/pfm:isPlayedBy/rdfs:label ?cardSchemeOperator ;
+      pfm:linkedAccount/pfm:accountNumber ?linkedAccountNumber .
+    }
+- question: Show me the transactions of the payment card number "4731042107549834" from 2024-07-01 to 2025-07-01
+  sparql: |
+    PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+    PREFIX pfm: <https://static.rwpz.net/spendcast/schema#> 
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> 
+    SELECT ?transactionId ?transactionDate ?transactionType ?transactionStatus ?amount ?currency ?recieptId WHERE { 
+      ?card pfm:cardNumber "4731042107549834" .
+      ?transaction a pfm:FinancialTransaction ;
+      rdfs:label ?transactionId ;
+      pfm:hasCard ?card ;
+      pfm:hasMonetaryAmount ?monetaryAmount ;
+      pfm:hasTransactionDate ?transactionDate ;
+      pfm:transactionType ?transactionType ;
+      pfm:status ?transactionStatus .
+      OPTIONAL { ?transaction pfm:hasReceipt/rdfs:label ?recieptId }.
+
+      ?monetaryAmount pfm:hasCurrency ?currency .
+      ?monetaryAmount pfm:hasAmount ?amount .
+      
+      FILTER(strstarts(?transactionStatus, "settled"))
+      FILTER (?transactionDate >= "2024-07-01"^^xsd:date)
+      FILTER (?transactionDate < "2025-07-01"^^xsd:date)
+    }
+- question: Show me all merchants that received a payment between 2024-10-01 and 2024-10-31
+  sparql: |
+    PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+    PREFIX pfm: <https://static.rwpz.net/spendcast/schema#>
+    SELECT DISTINCT ?payee WHERE {
+      ?transaction a pfm:FinancialTransaction ;
+      pfm:hasTransactionDate ?transactionDate ;
+      pfm:transactionType ?transactionType ;    
+      pfm:hasParticipant [
+          a pfm:Payee ;
+          pfm:isPlayedBy/rdfs:label ?payee 
+      ] .
+
+      FILTER(strstarts(?transactionType, "expense"))
+      FILTER (?transactionDate >= "2024-10-01"^^xsd:date)
+      FILTER (?transactionDate < "2024-10-31"^^xsd:date)
+    }  
+- question: Show me the receipt with the id="Receipt 20250627_184626_0033091_251_260"
+  sparql: |
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    PREFIX pfm: <https://static.rwpz.net/spendcast/schema#>
+    SELECT ?receiptId ?receiptDate ?totalAmount ?currency ?cardNumber 
+    WHERE {
+    ?receipt a pfm:Receipt ;
+      rdfs:label "Receipt 20250627_184626_0033091_251_260" ;
+      pfm:hasCard/pfm:cardNumber ?cardNumber ;
+      pfm:receiptDate ?receiptDate ;
+      pfm:receiptId ?receiptId ;
+      pfm:hasTotalAmount [a pfm:MonetaryAmount ; pfm:hasAmount ?totalAmount; pfm:hasCurrency ?currency] .
+    }
+- question: Show me the line items of the receipt with the id="Receipt 20250627_184626_0033091_251_260"
+  sparql: |
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    PREFIX pfm: <https://static.rwpz.net/spendcast/schema#>
+    SELECT ?description ?quantity ?unitPrice ?lineSubtotal ?productUrls
+    WHERE {
+        ?receipt a pfm:Receipt ;
+          rdfs:label "Receipt 20250627_184626_0033091_251_260";
+          pfm:hasLineItem	?lineItem .
+        ?lineItem pfm:itemDescription ?description ;
+          pfm:quantity ?quantity ;
+          pfm:unitPrice ?unitPrice ;
+          pfm:lineSubtotal ?lineSubtotal ;
+          pfm:hasProduct [a pfm:Product ; 
+          pfm:productUrls ?productUrls ;
+          pfm:category [a pfm:ProductCategory ; rdfs:label ?category ]] .
+    }

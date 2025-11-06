@@ -687,13 +687,6 @@ exs:description a owl:DatatypeProperty ;
     rdfs:domain exs:Product ;
     rdfs:range xsd:string .
 
-# Migros Origin Property
-exs:origin a owl:DatatypeProperty ;
-    rdfs:label "origin" ;
-    rdfs:comment "The origin of a product" ;
-    rdfs:domain exs:Product ;
-    rdfs:range xsd:string .
-
 # Migros Migipedia URL Property
 exs:migipediaUrl a owl:DatatypeProperty ;
     rdfs:label "Migipedia URL" ;
