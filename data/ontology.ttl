@@ -1,4 +1,3 @@
-
 @prefix exs: <https://static.rwpz.net/spendcast/schema#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -8,8 +7,8 @@
 
 # Ontology Declaration
 exs: a owl:Ontology ;
-    rdfs:label "FIBO Demo Extension Ontology" ;
-    rdfs:comment "Self-contained extension ontology for the FIBO demo financial data model" ;
+    rdfs:label "Financial business ontology" ;
+    rdfs:comment "Ontology for financial business information: banking, accounts, transactions, parties, roles" ;
     owl:versionInfo "2.0" .
 
 # =============================================================================
@@ -333,6 +332,7 @@ exs:hasCounterAmount a owl:ObjectProperty ;
 exs:hasCard a owl:ObjectProperty ;
     rdfs:label "has card" ;
     rdfs:comment "Links a transaction or receipt to its payment card" ;
+    rdfs:domain exs:FinancialTransaction .
     rdfs:range exs:PaymentCard .
 
 # Has Total Amount Property
